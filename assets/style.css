@@ -44,6 +44,7 @@ a:hover { opacity: 0.75; }
 .container { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
 .section { padding: 120px 0; border-top: 1px solid var(--border-subtle); }
 .section-dark { background: var(--bg-dark); }
+.section-accent { background: var(--bg-section); }
 
 .site-header {
   position: sticky; top: 0; z-index: 100;
