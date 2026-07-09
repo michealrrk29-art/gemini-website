@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Deal Calculator · Gemini Commercial Broker</title>
+<meta name="theme-color" content="#0D1B2A" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --navy:#0D1B2A;
+    --navy-2:#122436;
+    --panel:#132A3E;
+    --panel-2:#0F2233;
+    --line:rgba(232,227,214,0.10);
+    --line-strong:rgba(232,227,214,0.20);
+    --cream:#F2EEE3;
+    --steel:#8FA3B8;
+    --brass:#C4A15E;
+    --brass-soft:rgba(196,161,94,0.14);
+    --rose:#C97B7B;
+    --mint:#8FBF9F;
+  }
+  html,body{background:var(--navy); font-family:'Inter',sans-serif;}
+  .serif{font-family:'Fraunces','Georgia',serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  ::selection{ background: var(--brass-soft); }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{ opacity:0.4; }
+  select{ appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238FA3B8'/></svg>"); background-repeat:no-repeat; background-position:right 10px center; }
+</style>
+</head>
+<body class="min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useMemo, useState, useEffect } = React;
+
+/* ---------------- data ---------------- */
+
+const INCOTERMS = {
+  EXW: { freight:false, insurance:false, label:"EXW — Ex Works" },
+  FCA: { freight:false, insurance:false, label:"FCA — Free Carrier" },
+  FOB: { freight:false, insurance:false, label:"FOB — Free On Board" },
+  CFR: { freight:true,  insurance:false, label:"CFR — Cost & Freight" },
+  CIF: { freight:true,  insurance:true,  label:"CIF — Cost, Insurance & Freight" },
+  DAP: { freight:true,  insurance:true,  label:"DAP — Delivered At Place" },
+  DDP: { freight:true,  insurance:true,  label:"DDP — Delivered Duty Paid" },
+};
+const INCOTERM_KEYS = Object.keys(INCOTERMS);
+
+const CATEGORIES = {
+  "Petroleum products": [
+    { name: "ULSD 10ppm (Gasoil)", unit: "MT", benchmark: "ULSD 10ppm CIF NWE", density: 0.845, petro: true },
+    { name: "Gasoline AI-92", unit: "MT", benchmark: "AI-92 FOB Black Sea", density: 0.745, petro: true },
+    { name: "Gasoline AI-95 (Euro-5)", unit: "MT", benchmark: "AI-95 FOB Black Sea", density: 0.755, petro: true },
+    { name: "Crude Oil — Urals", unit: "MT", benchmark: "Urals FOB Primorsk", density: 0.870, petro: true },
+    { name: "Crude Oil — ESPO", unit: "MT", benchmark: "ESPO FOB Kozmino", density: 0.855, petro: true },
+  ],
+  "Fertilizers": [
+    { name: "Urea, Prilled", unit: "MT", benchmark: "Urea Prilled FOB Black Sea" },
+    { name: "Urea, Granular", unit: "MT", benchmark: "Urea Granular FOB Baltic" },
+    { name: "Ammonium Nitrate", unit: "MT", benchmark: "AN FOB Black Sea" },
+  ],
+  "Metals & minerals": [
+    { name: "Tungsten Oxide (APT)", unit: "MT", benchmark: "APT Europe (Metal Bulletin)" },
+    { name: "Copper Cathode, Grade A", unit: "MT", benchmark: "LME Copper Cash" },
+    { name: "Gold, 995/999", unit: "KG", benchmark: "LBMA AM Fix" },
+    { name: "Rare Earth Oxides", unit: "MT", benchmark: "Asian Metal RE Index" },
+  ],
+  "Agri commodities": [
+    { name: "Cocoa Beans", unit: "MT", benchmark: "ICE Cocoa (London)" },
+    { name: "Green Coffee, Robusta", unit: "MT", benchmark: "ICE Robusta" },
+    { name: "Green Coffee, Arabica", unit: "MT", benchmark: "ICE Arabica" },
+    { name: "Cashew Kernels, W320", unit: "MT", benchmark: "Vietnam FOB W320" },
+    { name: "Granulated Sulfur", unit: "MT", benchmark: "Sulfur FOB Black Sea" },
+    { name: "Wheat", unit: "MT", benchmark: "Black Sea FOB" },
+  ],
+};
+
+/* ---------------- helpers ---------------- */
+
+const fmt = (n, d = 2) =>
+  (isFinite(n) ? n : 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const usd = (n) => `$${fmt(n)}`;
+const num = (v) => (v === "" || v === null || v === undefined ? 0 : parseFloat(v));
+
+/* ---------------- primitives ---------------- */
+
+function Eyebrow({ children }) {
+  return <div className="text-[11px] uppercase tracking-[0.22em] text-[--steel]" style={{color:"var(--brass)"}}>{children}</div>;
+}
+
+function SectionTitle({ eyebrow, title }) {
+  return (
+    <div className="mb-5">
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="serif mt-1 text-2xl md:text-[26px] text-[--cream]" style={{color:"var(--cream)"}}>{title}</h2>
+    </div>
+  );
+}
+
+function Panel({ children, className }) {
+  return (
+    <div
+      className={`rounded-sm ${className||""}`}
+      style={{ background:"var(--panel)", border:"1px solid var(--line)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FieldRow({ label, children }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 border-b" style={{borderColor:"var(--line)"}}>
+      <span className="text-[13px]" style={{color:"var(--steel)"}}>{label}</span>
+      <div className="flex items-center gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function NumberInput({ value, onChange, w = "w-28", step = "any" }) {
+  return (
+    <input
+      type="number"
+      step={step}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${w} mono rounded-[2px] px-2 py-1 text-right text-[13px] outline-none`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--brass)" }}
+    />
+  );
+}
+
+function TextInput({ value, onChange, w = "w-40" }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${w} rounded-[2px] px-2 py-1 text-right text-[13px] outline-none`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+    />
+  );
+}
+
+function Select({ value, onChange, options, w = "w-44" }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${w} rounded-[2px] px-2 py-1.5 text-[13px] outline-none cursor-pointer`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+    >
+      {options.map((o) => (
+        <option key={o.value || o} value={o.value || o} style={{background:"#0F2233", color:"#F2EEE3"}}>
+          {o.label || o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Toggle({ checked, onChange, label }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none py-2">
+      <span
+        onClick={() => onChange(!checked)}
+        className="relative inline-block h-5 w-9 rounded-full transition-colors"
+        style={{ background: checked ? "var(--brass)" : "var(--panel-2)", border:"1px solid var(--line-strong)" }}
+      >
+        <span
+          className="absolute top-[1px] h-[16px] w-[16px] rounded-full transition-all"
+          style={{ left: checked ? "17px" : "1px", background: checked ? "#0D1B2A" : "var(--steel)" }}
+        />
+      </span>
+      <span className="text-[13px]" style={{color:"var(--steel)"}}>{label}</span>
+    </label>
+  );
+}
+
+function ResultRow({ label, value, bold, dim }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-[13px]" style={{color: dim ? "rgba(143,163,184,0.7)" : "var(--steel)", fontStyle: dim?"italic":"normal"}}>{label}</span>
+      <span className={`mono text-[13px] ${bold?"font-semibold":""}`} style={{color: bold ? "var(--cream)" : "var(--cream)"}}>{value}</span>
+    </div>
+  );
+}
+
+/* ---------------- main ---------------- */
+
+function DealCalculator() {
+  // Commodity & route
+  const catNames = Object.keys(CATEGORIES);
+  const [category, setCategory] = useState(catNames[0]);
+  const items = CATEGORIES[category];
+  const [commodityIdx, setCommodityIdx] = useState(0);
+  const commodity = items[commodityIdx] || items[0];
+
+  const [loadPort, setLoadPort] = useState("MURMANSK");
+  const [dischargePort, setDischargePort] = useState("ALIAGA, TURKEY");
+  const [quantity, setQuantity] = useState(40000);
+
+  useEffect(() => { setCommodityIdx(0); }, [category]);
+
+  // Commercial terms
+  const [benchmarkLabel, setBenchmarkLabel] = useState(commodity.benchmark);
+  const [benchmarkPrice, setBenchmarkPrice] = useState(945.25);
+  useEffect(() => { setBenchmarkLabel(commodity.benchmark); }, [commodity]);
+
+  const [purchaseIncoterm, setPurchaseIncoterm] = useState("CIF");
+  const [saleIncoterm, setSaleIncoterm] = useState("DAP");
+  const [purchaseDiscount, setPurchaseDiscount] = useState(95.0);
+  const [saleDiscount, setSaleDiscount] = useState(15.0);
+  const [escalation, setEscalation] = useState(13.29);
+
+  // Freight & insurance
+  const suggestFreight = INCOTERMS[saleIncoterm].freight && !INCOTERMS[purchaseIncoterm].freight;
+  const suggestInsurance = INCOTERMS[saleIncoterm].insurance && !INCOTERMS[purchaseIncoterm].insurance;
+  const [freightOn, setFreightOn] = useState(suggestFreight);
+  const [insuranceOn, setInsuranceOn] = useState(suggestInsurance);
+  useEffect(() => { setFreightOn(suggestFreight); }, [purchaseIncoterm, saleIncoterm]);
+  useEffect(() => { setInsuranceOn(suggestInsurance); }, [purchaseIncoterm, saleIncoterm]);
+
+  const [freightLeg1, setFreightLeg1] = useState(1900000);
+  const [freightLeg2, setFreightLeg2] = useState(0);
+  const [insurancePct, setInsurancePct] = useState(0.11);
+  const [institute110, setInstitute110] = useState(true);
+
+  // Other costs
+  const [inspectionRate, setInspectionRate] = useState(0.25);
+  const [demDays, setDemDays] = useState(2);
+  const [demRate, setDemRate] = useState(40000);
+  const [outturn, setOutturn] = useState(0);
+  const [storageCost, setStorageCost] = useState(0);
+  const [commissionRate, setCommissionRate] = useState(3);
+  const [agencyRate, setAgencyRate] = useState(2);
+  const [fxPct, setFxPct] = useState(0.3);
+
+  // Financing
+  const [financeCargoPct, setFinanceCargoPct] = useState(0);
+  const [fcDays, setFcDays] = useState(51);
+  const [financeFreightPct, setFinanceFreightPct] = useState(0);
+  const [ffDays, setFfDays] = useState(21);
+  const [hedgePct, setHedgePct] = useState(15);
+  const [collateralPct, setCollateralPct] = useState(10);
+  const [exposureDays, setExposureDays] = useState(0);
+  const [cashBackPct, setCashBackPct] = useState(0);
+  const [prepaymentDays, setPrepaymentDays] = useState(30);
+  const [lcPct, setLcPct] = useState(10);
+  const [lcDays, setLcDays] = useState(0);
+
+  const c = useMemo(() => {
+    const q = num(quantity);
+    const salePerUnit = num(benchmarkPrice) - num(saleDiscount) + num(escalation);
+    const purchasePerUnit = num(benchmarkPrice) - num(purchaseDiscount) + num(escalation);
+    const saleTotal = salePerUnit * q;
+    const purchaseTotal = purchasePerUnit * q;
+
+    const freightTotal = freightOn ? (num(freightLeg1) + num(freightLeg2)) : 0;
+    const insuranceBase = (purchaseTotal + freightTotal) * (institute110 ? 1.10 : 1.0);
+    const insuranceCost = insuranceOn ? (num(insurancePct) / 100) * insuranceBase : 0;
+
+    const inspectionCost = num(inspectionRate) * q;
+    const demurrageCost = num(demDays) * num(demRate);
+    const commissionCost = num(commissionRate) * q;
+    const agencyCost = num(agencyRate) * q;
+    const fxCost = (num(fxPct) / 100) * saleTotal;
+
+    const financeCargoCost = purchaseTotal * (num(financeCargoPct) / 100) * (num(fcDays) / 360);
+    const financeFreightCost = freightTotal * (num(financeFreightPct) / 100) * (num(ffDays) / 360);
+    const hedgeExposure = purchaseTotal * (1 - num(collateralPct) / 100);
+    const hedgeCost = hedgeExposure * (num(hedgePct) / 100) * (num(exposureDays) / 360);
+    const prepaymentAmount = purchaseTotal;
+    const cashBackAmount = prepaymentAmount * (num(cashBackPct) / 100) * (num(prepaymentDays) / 360);
+    const lcDiscountCost = purchaseTotal * (num(lcPct) / 100) * (num(lcDays) / 360);
+
+    const lineItems = [
+      { label: "Freight", value: freightTotal },
+      { label: "Insurance", value: insuranceCost },
+      { label: "Cargo inspection", value: inspectionCost },
+      { label: "Demurrage", value: demurrageCost },
+      { label: "Outturn", value: Number(outturn) },
+      { label: "Storage", value: Number(storageCost) },
+      { label: "Commissions", value: commissionCost },
+      { label: "Agency / docs", value: agencyCost },
+      { label: "FX conversion", value: fxCost },
+      { label: "Finance — cargo", value: financeCargoCost },
+      { label: "Finance — freight", value: financeFreightCost },
+      { label: "Hedge financing", value: hedgeCost },
+      { label: "Cash back (credit)", value: -cashBackAmount },
+      { label: "LC discounting", value: lcDiscountCost },
+    ];
+
+    const costsGrandTotal = lineItems.reduce((s, i) => s + i.value, 0);
+    const totalCostsInclCargo = purchaseTotal + costsGrandTotal;
+    const margin = saleTotal - totalCostsInclCargo;
+    const marginPerUnit = q ? margin / q : 0;
+    const marginPctOfSale = saleTotal ? (margin / saleTotal) * 100 : 0;
+    const roiOnPurchase = purchaseTotal ? (margin / purchaseTotal) * 100 : 0;
+    const breakEvenPerUnit = q ? totalCostsInclCargo / q : 0;
+
+    let bbl = null;
+    if (commodity.petro && commodity.density) {
+      bbl = (q * 6.2898) / commodity.density;
+    }
+
+    return {
+      q, salePerUnit, purchasePerUnit, saleTotal, purchaseTotal, freightTotal, insuranceCost,
+      inspectionCost, demurrageCost, commissionCost, agencyCost, fxCost,
+      financeCargoCost, financeFreightCost, hedgeCost, cashBackAmount, lcDiscountCost,
+      lineItems, costsGrandTotal, totalCostsInclCargo, margin, marginPerUnit,
+      marginPctOfSale, roiOnPurchase, breakEvenPerUnit, bbl,
+    };
+  }, [
+    quantity, benchmarkPrice, saleDiscount, purchaseDiscount, escalation,
+    freightOn, freightLeg1, freightLeg2, insuranceOn, insurancePct, institute110,
+    inspectionRate, demDays, demRate, outturn, storageCost, commissionRate, agencyRate, fxPct,
+    financeCargoPct, fcDays, financeFreightPct, ffDays, hedgePct, collateralPct, exposureDays,
+    cashBackPct, prepaymentDays, lcPct, lcDays, commodity,
+  ]);
+
+  const marginPositive = c.margin >= 0;
+  const maxCost = Math.max(1, ...c.lineItems.map((i) => Math.abs(i.value)));
+
+  return (
+    <div style={{ background:"var(--navy)", color:"var(--cream)" }} className="min-h-screen">
+      {/* nav */}
+      <div className="border-b" style={{ borderColor:"var(--line)" }}>
+        <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between">
+          <div className="serif text-[15px] tracking-wide" style={{color:"var(--cream)"}}>GEMINI <span style={{color:"var(--brass)"}}>·</span> <span className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--steel)"}}>Commercial Broker</span></div>
+          <div className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--steel)"}}>Deal Calculator</div>
+        </div>
+      </div>
+
+      {/* hero */}
+      <div className="mx-auto max-w-6xl px-5 pt-10 pb-6">
+        <Eyebrow>Internal tool</Eyebrow>
+        <h1 className="serif mt-2 text-3xl md:text-4xl" style={{color:"var(--cream)"}}>Physical trade P&amp;L calculator</h1>
+        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed" style={{color:"var(--steel)"}}>
+          Select commodity, price basis and delivery terms — freight and insurance are applied automatically based on the Incoterms gap between purchase and sale legs. All figures recalculate live.
+        </p>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-5 pb-16 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Commodity & route */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Setup" title="Commodity & route" />
+            <FieldRow label="Category">
+              <Select value={category} onChange={setCategory} options={catNames} w="w-52" />
+            </FieldRow>
+            <FieldRow label="Commodity">
+              <Select
+                value={commodityIdx}
+                onChange={(v) => setCommodityIdx(Number(v))}
+                options={items.map((it, i) => ({ value: i, label: it.name }))}
+                w="w-52"
+              />
+            </FieldRow>
+            <FieldRow label="Quantity">
+              <NumberInput value={quantity} onChange={setQuantity} step="1" />
+              <span className="text-[12px] w-10" style={{color:"var(--steel)"}}>{commodity.unit}</span>
+            </FieldRow>
+            <FieldRow label="Port of loading">
+              <TextInput value={loadPort} onChange={setLoadPort} />
+            </FieldRow>
+            <FieldRow label="Discharge port">
+              <TextInput value={dischargePort} onChange={setDischargePort} />
+            </FieldRow>
+            {commodity.petro && (
+              <div className="pt-2 text-[12px]" style={{color:"var(--steel)"}}>
+                ≈ <span className="mono" style={{color:"var(--brass)"}}>{fmt(c.bbl, 0)}</span> bbl at density {commodity.density} — indicative conversion only.
+              </div>
+            )}
+          </Panel>
+
+          {/* Commercial terms */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Pricing" title="Commercial terms" />
+            <FieldRow label="Benchmark">
+              <TextInput value={benchmarkLabel} onChange={setBenchmarkLabel} w="w-52" />
+            </FieldRow>
+            <FieldRow label="Benchmark price">
+              <NumberInput value={benchmarkPrice} onChange={setBenchmarkPrice} />
+              <span className="text-[12px] w-14" style={{color:"var(--steel)"}}>/{commodity.unit}</span>
+            </FieldRow>
+            <FieldRow label="Escalation (+)">
+              <NumberInput value={escalation} onChange={setEscalation} />
+            </FieldRow>
+
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <div>
+                <Eyebrow>Purchase leg</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <Select value={purchaseIncoterm} onChange={setPurchaseIncoterm} options={INCOTERM_KEYS.map(k=>({value:k,label:INCOTERMS[k].label}))} w="w-full" />
+                  <FieldRow label="Discount to bmk">
+                    <NumberInput value={purchaseDiscount} onChange={setPurchaseDiscount} w="w-24" />
+                  </FieldRow>
+                  <ResultRow label="Price / unit" value={usd(c.purchasePerUnit)} />
+                  <ResultRow label="Purchase Total" value={usd(c.purchaseTotal)} bold />
+                </div>
+              </div>
+              <div>
+                <Eyebrow>Sale leg</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <Select value={saleIncoterm} onChange={setSaleIncoterm} options={INCOTERM_KEYS.map(k=>({value:k,label:INCOTERMS[k].label}))} w="w-full" />
+                  <FieldRow label="Discount to bmk">
+                    <NumberInput value={saleDiscount} onChange={setSaleDiscount} w="w-24" />
+                  </FieldRow>
+                  <ResultRow label="Price / unit" value={usd(c.salePerUnit)} />
+                  <ResultRow label="Sale Total" value={usd(c.saleTotal)} bold />
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Freight & insurance */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Logistics" title="Freight & insurance" />
+            <p className="text-[12px] mb-2" style={{color:"var(--steel)"}}>
+              Auto-suggested from the Incoterms gap between {purchaseIncoterm} (purchase) and {saleIncoterm} (sale). Override if your routing differs.
+            </p>
+            <Toggle checked={freightOn} onChange={setFreightOn} label={`Gemini bears freight cost ${suggestFreight ? "(suggested: on)" : "(suggested: off)"}`} />
+            {freightOn && (
+              <>
+                <FieldRow label="Freight, Leg 1"><NumberInput value={freightLeg1} onChange={setFreightLeg1} /></FieldRow>
+                <FieldRow label="Freight, Leg 2"><NumberInput value={freightLeg2} onChange={setFreightLeg2} /></FieldRow>
+              </>
+            )}
+            <div className="mt-2">
+              <Toggle checked={insuranceOn} onChange={setInsuranceOn} label={`Gemini bears insurance cost ${suggestInsurance ? "(suggested: on)" : "(suggested: off)"}`} />
+            </div>
+            {insuranceOn && (
+              <>
+                <FieldRow label="Insurance rate"><NumberInput value={insurancePct} onChange={setInsurancePct} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <Toggle checked={institute110} onChange={setInstitute110} label="Institute Cargo Clause basis (110% of CFR value)" />
+              </>
+            )}
+          </Panel>
+
+          {/* Other costs */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Costs" title="Operational costs" />
+            <FieldRow label="Cargo inspection"><NumberInput value={inspectionRate} onChange={setInspectionRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="Demurrage, days"><NumberInput value={demDays} onChange={setDemDays} w="w-24" step="1" /></FieldRow>
+            <FieldRow label="Demurrage rate"><NumberInput value={demRate} onChange={setDemRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/day</span></FieldRow>
+            <FieldRow label="Outturn loss / gain"><NumberInput value={outturn} onChange={setOutturn} w="w-24" /></FieldRow>
+            <FieldRow label="Storage costs"><NumberInput value={storageCost} onChange={setStorageCost} w="w-24" /></FieldRow>
+            <FieldRow label="Commissions"><NumberInput value={commissionRate} onChange={setCommissionRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="Agency / docs"><NumberInput value={agencyRate} onChange={setAgencyRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="FX conversion"><NumberInput value={fxPct} onChange={setFxPct} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>% of sale</span></FieldRow>
+          </Panel>
+
+          {/* Financing */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Working capital" title="Financing" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+              <div>
+                <Eyebrow>Finance — cargo</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={financeCargoPct} onChange={setFinanceCargoPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Days"><NumberInput value={fcDays} onChange={setFcDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.financeCargoCost)} dim />
+              </div>
+              <div>
+                <Eyebrow>Finance — freight</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={financeFreightPct} onChange={setFinanceFreightPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Days"><NumberInput value={ffDays} onChange={setFfDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.financeFreightCost)} dim />
+              </div>
+              <div className="pt-3">
+                <Eyebrow>Hedge financing</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={hedgePct} onChange={setHedgePct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Collateral"><NumberInput value={collateralPct} onChange={setCollateralPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Exposure days"><NumberInput value={exposureDays} onChange={setExposureDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.hedgeCost)} dim />
+              </div>
+              <div className="pt-3">
+                <Eyebrow>Cash back / LC</Eyebrow>
+                <FieldRow label="Cash back rate"><NumberInput value={cashBackPct} onChange={setCashBackPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Prepay days"><NumberInput value={prepaymentDays} onChange={setPrepaymentDays} w="w-20" step="1" /></FieldRow>
+                <FieldRow label="LC discount rate"><NumberInput value={lcPct} onChange={setLcPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="LC days"><NumberInput value={lcDays} onChange={setLcDays} w="w-20" step="1" /></FieldRow>
+              </div>
+            </div>
+          </Panel>
+        </div>
+
+        {/* Sticky analysis column */}
+        <div className="space-y-6 lg:sticky lg:top-6 self-start">
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Result" title="Margin" />
+            <div
+              className="rounded-sm p-4 mb-4"
+              style={{ background: marginPositive ? "rgba(196,161,94,0.14)" : "rgba(201,123,123,0.14)", border: `1px solid ${marginPositive ? "var(--brass)" : "var(--rose)"}` }}
+            >
+              <div className="text-[11px] uppercase tracking-[0.18em]" style={{color:"var(--steel)"}}>Total margin</div>
+              <div className="mono text-3xl mt-1" style={{color: marginPositive ? "var(--brass)" : "var(--rose)"}}>{usd(c.margin)}</div>
+              <div className="text-[12px] mt-1" style={{color:"var(--steel)"}}>{usd(c.marginPerUnit)} / {commodity.unit} · {fmt(c.marginPctOfSale)}% of sale value</div>
+            </div>
+            <ResultRow label="Sale Price, Total" value={usd(c.saleTotal)} />
+            <ResultRow label="Purchase Price, Total" value={usd(c.purchaseTotal)} />
+            <ResultRow label="Costs Grand Total" value={usd(c.costsGrandTotal)} />
+            <ResultRow label="Total costs incl. cargo" value={usd(c.totalCostsInclCargo)} bold />
+            <div className="mt-2 pt-2 border-t" style={{borderColor:"var(--line)"}}>
+              <ResultRow label="Break-even price" value={usd(c.breakEvenPerUnit) + " /" + commodity.unit} />
+              <ResultRow label="ROI on purchase capital" value={fmt(c.roiOnPurchase) + "%"} />
+            </div>
+          </Panel>
+
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Analysis" title="Cost structure" />
+            <div className="space-y-2.5">
+              {c.lineItems.filter(i => Math.abs(i.value) > 0.005).map((i) => (
+                <div key={i.label}>
+                  <div className="flex items-center justify-between text-[12px] mb-1">
+                    <span style={{color:"var(--steel)"}}>{i.label}</span>
+                    <span className="mono" style={{color: i.value < 0 ? "var(--mint)" : "var(--cream)"}}>{i.value < 0 ? "−" : ""}{usd(Math.abs(i.value))}</span>
+                  </div>
+                  <div className="h-[3px] w-full rounded-full" style={{background:"var(--panel-2)"}}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, (Math.abs(i.value) / maxCost) * 100)}%`,
+                        background: i.value < 0 ? "var(--mint)" : "var(--brass)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {c.lineItems.every(i => Math.abs(i.value) < 0.005) && (
+                <div className="text-[12px]" style={{color:"var(--steel)"}}>No cost lines active — adjust rates above.</div>
+              )}
+            </div>
+          </Panel>
+
+          <div className="text-[11px] leading-relaxed" style={{color:"var(--steel)"}}>
+            Financing costs use a days/360 cost-of-carry convention. Freight and insurance inclusion follows standard Incoterms responsibility (FOB/EXW/FCA = buyer arranges; CFR = freight only; CIF/DAP/DDP = freight &amp; insurance) — override manually for non-standard routings.
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t py-6 text-center text-[11px]" style={{ borderColor:"var(--line)", color:"var(--steel)" }}>
+        GEMINI · Commercial Broker · Dubai — internal deal tool, not for external distribution.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<DealCalculator />);
+</script>
+</body>
+</html>
