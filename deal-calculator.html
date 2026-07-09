@@ -116,6 +116,22 @@ const PORT_OPTIONS = [
   "Fremantle, Australia",
 ];
 
+const ROUTE_PRESETS = [
+  { label: "Nigeria → Rotterdam (Jet A1)", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands", note: "Typical jet fuel flow for European end users" },
+  { label: "Morocco → Rotterdam", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Rotterdam, Netherlands", note: "North Africa to Northwest Europe" },
+  { label: "Morocco → Indonesia", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Tanjung Priok, Indonesia", note: "Long-haul re-export scenario" },
+  { label: "Russia → Rotterdam", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", note: "Classic diesel export route" },
+  { label: "UAE → Singapore", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", note: "Middle East to Asia transshipment" },
+  { label: "Nigeria → Antwerp", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Antwerp, Belgium", note: "West Africa to continental Europe" },
+];
+
+const COMMODITY_DEFAULT_ROUTES = {
+  "Jet A1": { loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands" },
+  "ULSD 10ppm (Gasoil)": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
+  "Gasoline AI-92": { loadPort: "Novorossiysk, Russia", dischargePort: "Antwerp, Belgium" },
+  "Urea, Prilled": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
+};
+
 const CATEGORIES = {
   "Petroleum products": [
     { name: "ULSD 10ppm (Gasoil)", unit: "MT", benchmark: "ULSD 10ppm CIF NWE", density: 0.845, petro: true, quote: 945.25 },
@@ -274,6 +290,13 @@ function DealCalculator() {
   const [quantity, setQuantity] = useState(40000);
 
   useEffect(() => { setCommodityIdx(0); }, [category]);
+  useEffect(() => {
+    const defaultRoute = COMMODITY_DEFAULT_ROUTES[commodity.name];
+    if (defaultRoute) {
+      setLoadPort(defaultRoute.loadPort);
+      setDischargePort(defaultRoute.dischargePort);
+    }
+  }, [commodity.name]);
 
   // Commercial terms
   const [benchmarkLabel, setBenchmarkLabel] = useState(commodity.benchmark);
@@ -448,6 +471,25 @@ function DealCalculator() {
             <FieldRow label="Discharge port">
               <TextInput value={dischargePort} onChange={setDischargePort} listId="port-options" placeholder="Type or select" />
             </FieldRow>
+            <div className="mt-3 rounded-[2px] p-3" style={{ background:"var(--panel-2)", border:"1px solid var(--line)" }}>
+              <div className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--brass)"}}>Popular route presets</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {ROUTE_PRESETS.filter((preset) => preset.commodity === commodity.name).map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => { setLoadPort(preset.loadPort); setDischargePort(preset.dischargePort); }}
+                    className="rounded-[2px] px-2.5 py-1.5 text-[11px] uppercase tracking-[0.12em] transition"
+                    style={{ background:"var(--panel)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 text-[12px]" style={{color:"var(--steel)"}}>
+                Selected route: <span className="mono" style={{color:"var(--cream)"}}>{loadPort} → {dischargePort}</span>
+              </div>
+            </div>
             {commodity.petro && (
               <div className="pt-2 text-[12px]" style={{color:"var(--steel)"}}>
                 ≈ <span className="mono" style={{color:"var(--brass)"}}>{fmt(c.bbl, 0)}</span> bbl at density {commodity.density} — indicative conversion only.
