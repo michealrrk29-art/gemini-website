@@ -54,12 +54,28 @@ const INCOTERMS = {
   DDP: { freight:true,  insurance:true,  label:"DDP — Delivered Duty Paid" },
 };
 const INCOTERM_KEYS = Object.keys(INCOTERMS);
+const PORT_OPTIONS = [
+  "Tangier Med, Morocco",
+  "Casablanca, Morocco",
+  "Mersin, Turkey",
+  "Aliaga, Turkey",
+  "Jebel Ali, UAE",
+  "Murmansk, Russia",
+  "Novorossiysk, Russia",
+  "Rotterdam, Netherlands",
+  "Singapore",
+  "Tanjung Priok, Indonesia",
+  "Jakarta, Indonesia",
+  "Houston, USA",
+  "Gdansk, Poland",
+];
 
 const CATEGORIES = {
   "Petroleum products": [
     { name: "ULSD 10ppm (Gasoil)", unit: "MT", benchmark: "ULSD 10ppm CIF NWE", density: 0.845, petro: true, quote: 945.25 },
     { name: "Gasoline AI-92", unit: "MT", benchmark: "AI-92 FOB Black Sea", density: 0.745, petro: true, quote: 760.5 },
     { name: "Gasoline AI-95 (Euro-5)", unit: "MT", benchmark: "AI-95 FOB Black Sea", density: 0.755, petro: true, quote: 789.4 },
+    { name: "Jet A1", unit: "MT", benchmark: "Jet A1 FOB ARA", density: 0.804, petro: true, quote: 815.0 },
     { name: "Crude Oil — Urals", unit: "MT", benchmark: "Urals FOB Primorsk", density: 0.870, petro: true, quote: 670.1 },
     { name: "Crude Oil — ESPO", unit: "MT", benchmark: "ESPO FOB Kozmino", density: 0.855, petro: true, quote: 697.8 },
   ],
@@ -139,12 +155,14 @@ function NumberInput({ value, onChange, w = "w-28", step = "any" }) {
   );
 }
 
-function TextInput({ value, onChange, w = "w-40" }) {
+function TextInput({ value, onChange, w = "w-40", listId, placeholder = "" }) {
   return (
     <input
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      list={listId}
+      placeholder={placeholder}
       className={`${w} rounded-[2px] px-2 py-1 text-right text-[13px] outline-none`}
       style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
     />
@@ -205,8 +223,8 @@ function DealCalculator() {
   const [commodityIdx, setCommodityIdx] = useState(0);
   const commodity = items[commodityIdx] || items[0];
 
-  const [loadPort, setLoadPort] = useState("MURMANSK");
-  const [dischargePort, setDischargePort] = useState("ALIAGA, TURKEY");
+  const [loadPort, setLoadPort] = useState("Tangier Med, Morocco");
+  const [dischargePort, setDischargePort] = useState("Tanjung Priok, Indonesia");
   const [quantity, setQuantity] = useState(40000);
 
   useEffect(() => { setCommodityIdx(0); }, [category]);
@@ -353,6 +371,10 @@ function DealCalculator() {
         </p>
       </div>
 
+      <datalist id="port-options">
+        {PORT_OPTIONS.map((port) => <option key={port} value={port} />)}
+      </datalist>
+
       <div className="mx-auto max-w-6xl px-5 pb-16 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
 
@@ -375,10 +397,10 @@ function DealCalculator() {
               <span className="text-[12px] w-10" style={{color:"var(--steel)"}}>{commodity.unit}</span>
             </FieldRow>
             <FieldRow label="Port of loading">
-              <TextInput value={loadPort} onChange={setLoadPort} />
+              <TextInput value={loadPort} onChange={setLoadPort} listId="port-options" placeholder="Type or select" />
             </FieldRow>
             <FieldRow label="Discharge port">
-              <TextInput value={dischargePort} onChange={setDischargePort} />
+              <TextInput value={dischargePort} onChange={setDischargePort} listId="port-options" placeholder="Type or select" />
             </FieldRow>
             {commodity.petro && (
               <div className="pt-2 text-[12px]" style={{color:"var(--steel)"}}>
