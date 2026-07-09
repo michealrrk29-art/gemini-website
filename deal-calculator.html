@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="/assets/vendor/react.production.min.js"></script>
+<script src="/assets/vendor/react-dom.production.min.js"></script>
+<script src="/assets/vendor/babel.min.js"></script>
+<script src="/assets/vendor/tailwindcdn.js"></script>
 <style>
   :root{
     --navy:#0D1B2A;
@@ -38,7 +38,26 @@
 </head>
 <body class="min-h-screen">
 <div id="root"></div>
-
+<div id="root"></div>
+<!-- Fallback overlay shown when the React app fails to mount (helps diagnose blank/blue page) -->
+<div id="calc-fallback" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.95);color:var(--cream);z-index:9999;align-items:center;justify-content:center;text-align:center;padding:24px;">
+  <div style="max-width:760px;margin:auto;">
+    <h2 style="margin:0 0 8px;font-family:Fraunces,serif;color:var(--cream);">Deal calculator не загрузился</h2>
+    <p style="margin:0 0 16px;color:var(--steel);line-height:1.5;">Страница выглядит пустой — возможно, блокируются CDN-скрипты или трансформация в браузере. Откройте DevTools → Console/Network и проверьте ошибки, либо перезагрузите страницу.</p>
+    <div>
+      <button id="calc-fallback-reload" style="background:var(--gold);color:var(--bg-deep);border:none;padding:10px 14px;border-radius:3px;cursor:pointer;margin-right:8px;">Перезагрузить страницу</button>
+      <button id="calc-fallback-console" style="background:transparent;color:var(--cream);border:1px solid rgba(201,123,123,0.12);padding:8px 12px;border-radius:3px;cursor:pointer;">Показать инструкцию</button>
+    </div>
+    <div id="calc-fallback-instr" style="display:none;margin-top:12px;text-align:left;color:var(--steel);font-size:13px;">
+      <p style="margin:0 0 8px;">Проверьте следующее:</p>
+      <ol style="padding-left:18px;margin:0;">
+        <li>Включён JavaScript в браузере?</li>
+        <li>Нет ли блокировщиков (adblock/CSP) для CDN: <code>cdnjs.cloudflare.com</code>, <code>cdn.tailwindcss.com</code>?</li>
+        <li>Откройте DevTools → Console и Network, найдите ошибки загрузки скриптов.</li>
+      </ol>
+    </div>
+  </div>
+</div>
 <script type="text/babel" data-presets="react">
 const { useMemo, useState, useEffect } = React;
 
@@ -116,6 +135,68 @@ const PORT_OPTIONS = [
   "Fremantle, Australia",
 ];
 
+const PORT_COORDINATES = {
+  "Tangier Med, Morocco": { lat: 35.85, lon: -5.88 },
+  "Casablanca, Morocco": { lat: 33.95, lon: -6.42 },
+  "Mersin, Turkey": { lat: 36.80, lon: 34.64 },
+  "Aliaga, Turkey": { lat: 38.46, lon: 26.88 },
+  "Jebel Ali, UAE": { lat: 24.98, lon: 55.05 },
+  "Murmansk, Russia": { lat: 68.97, lon: 33.07 },
+  "Novorossiysk, Russia": { lat: 44.72, lon: 37.77 },
+  "Rotterdam, Netherlands": { lat: 51.95, lon: 4.13 },
+  "Amsterdam, Netherlands": { lat: 52.38, lon: 4.90 },
+  "Antwerp, Belgium": { lat: 51.22, lon: 4.40 },
+  "Hamburg, Germany": { lat: 53.55, lon: 9.99 },
+  "Bremerhaven, Germany": { lat: 53.55, lon: 8.58 },
+  "Le Havre, France": { lat: 49.49, lon: 0.10 },
+  "Genoa, Italy": { lat: 44.40, lon: 8.93 },
+  "Piraeus, Greece": { lat: 37.94, lon: 23.64 },
+  "Valencia, Spain": { lat: 39.47, lon: -0.38 },
+  "Singapore": { lat: 1.27, lon: 103.82 },
+  "Tanjung Priok, Indonesia": { lat: 6.12, lon: 106.88 },
+  "Jakarta, Indonesia": { lat: 6.12, lon: 106.85 },
+  "Busan, South Korea": { lat: 35.10, lon: 129.04 },
+  "Shanghai, China": { lat: 31.23, lon: 121.47 },
+  "Ningbo-Zhoushan, China": { lat: 29.95, lon: 121.82 },
+  "Yantian, China": { lat: 22.53, lon: 114.27 },
+  "Dubai, UAE": { lat: 25.25, lon: 55.33 },
+  "Abu Dhabi, UAE": { lat: 24.47, lon: 54.37 },
+  "Doha, Qatar": { lat: 25.27, lon: 51.55 },
+  "Jeddah, Saudi Arabia": { lat: 21.54, lon: 39.15 },
+  "King Abdullah Port, Saudi Arabia": { lat: 23.00, lon: 38.00 },
+  "Houston, USA": { lat: 29.75, lon: -95.37 },
+  "New Orleans, USA": { lat: 29.95, lon: -90.07 },
+  "Long Beach, USA": { lat: 33.77, lon: -118.19 },
+  "Los Angeles, USA": { lat: 33.74, lon: -118.27 },
+  "New York / New Jersey, USA": { lat: 40.65, lon: -74.0 },
+  "Santos, Brazil": { lat: -23.95, lon: -46.33 },
+  "Paranagua, Brazil": { lat: -25.53, lon: -48.52 },
+  "Cape Town, South Africa": { lat: -33.92, lon: 18.42 },
+  "Durban, South Africa": { lat: -29.87, lon: 31.02 },
+  "Lagos, Nigeria": { lat: 6.45, lon: 3.39 },
+  "Port Harcourt, Nigeria": { lat: 4.75, lon: 7.02 },
+  "Apapa, Nigeria": { lat: 6.45, lon: 3.40 },
+  "Tema, Ghana": { lat: 5.66, lon: -0.02 },
+  "Abidjan, Ivory Coast": { lat: 5.35, lon: -4.02 },
+  "Mombasa, Kenya": { lat: -4.05, lon: 39.67 },
+  "Dar es Salaam, Tanzania": { lat: -6.80, lon: 39.28 },
+  "Maputo, Mozambique": { lat: -25.96, lon: 32.58 },
+  "Djibouti": { lat: 11.60, lon: 43.15 },
+  "Suez, Egypt": { lat: 29.97, lon: 32.55 },
+  "Alexandria, Egypt": { lat: 31.20, lon: 29.91 },
+  "Haldia, India": { lat: 22.03, lon: 88.06 },
+  "Mumbai, India": { lat: 18.95, lon: 72.82 },
+  "Chennai, India": { lat: 13.08, lon: 80.28 },
+  "Colombo, Sri Lanka": { lat: 6.93, lon: 79.85 },
+  "Port Klang, Malaysia": { lat: 3.00, lon: 101.35 },
+  "Laem Chabang, Thailand": { lat: 13.09, lon: 100.92 },
+  "Ho Chi Minh City, Vietnam": { lat: 10.76, lon: 106.70 },
+  "Hai Phong, Vietnam": { lat: 20.87, lon: 106.68 },
+  "Melbourne, Australia": { lat: -37.81, lon: 144.96 },
+  "Sydney, Australia": { lat: -33.86, lon: 151.20 },
+  "Fremantle, Australia": { lat: -32.05, lon: 115.74 },
+};
+
 const ROUTE_PRESETS = [
   { label: "Aviation — Nigeria → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "Lufthansa / kerosene route into Northwest Europe" },
   { label: "Aviation — Morocco → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "North Africa jet fuel export" },
@@ -135,6 +216,42 @@ const COMMODITY_DEFAULT_ROUTES = {
   "Urea, Prilled": { loadPort: "Novorossiysk, Russia", dischargePort: "Ho Chi Minh City, Vietnam" },
   "Urea, Granular": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
   "Cashew Kernels, W320": { loadPort: "Mumbai, India", dischargePort: "Ho Chi Minh City, Vietnam" },
+};
+
+const FREIGHT_RATE_DEFAULTS = {
+  "Jet A1": 0.030,
+  "ULSD 10ppm (Gasoil)": 0.022,
+  "Gasoline AI-92": 0.023,
+  "Gasoline AI-95 (Euro-5)": 0.024,
+  "Crude Oil — Urals": 0.020,
+  "Crude Oil — ESPO": 0.020,
+  "Urea, Prilled": 0.018,
+  "Urea, Granular": 0.017,
+  "Ammonium Nitrate": 0.017,
+  "Tungsten Oxide (APT)": 0.025,
+  "Copper Cathode, Grade A": 0.030,
+  "Gold, 995/999": 0.035,
+  "Rare Earth Oxides": 0.028,
+  "Cocoa Beans": 0.019,
+  "Green Coffee, Robusta": 0.020,
+  "Green Coffee, Arabica": 0.022,
+  "Cashew Kernels, W320": 0.021,
+  "Granulated Sulfur": 0.017,
+  "Wheat": 0.016,
+};
+
+const FREIGHT_RATE_ROUTE_OVERRIDES = {
+  "Lagos, Nigeria|Rotterdam, Netherlands": 0.035,
+  "Tangier Med, Morocco|Rotterdam, Netherlands": 0.028,
+  "Jebel Ali, UAE|Singapore": 0.031,
+  "Novorossiysk, Russia|Ho Chi Minh City, Vietnam": 0.025,
+  "Novorossiysk, Russia|Rotterdam, Netherlands": 0.022,
+};
+
+function getSuggestedFreightRate(commodityName, loadPort, dischargePort) {
+  const key = `${loadPort}|${dischargePort}`;
+  return FREIGHT_RATE_ROUTE_OVERRIDES[key] ?? FREIGHT_RATE_DEFAULTS[commodityName] ?? 0.025;
+}
 
 const CATEGORIES = {
   "Petroleum products": [
@@ -172,6 +289,28 @@ const fmt = (n, d = 2) =>
   (isFinite(n) ? n : 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const usd = (n) => `$${fmt(n)}`;
 const num = (v) => (v === "" || v === null || v === undefined ? 0 : parseFloat(v));
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function getDistanceNm(lat1, lon1, lat2, lon2) {
+  const R = 3440.065; // nautical miles
+  const φ1 = toRadians(lat1);
+  const φ2 = toRadians(lat2);
+  const Δφ = toRadians(lat2 - lat1);
+  const Δλ = toRadians(lon2 - lon1);
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getPortDistance(loadPort, dischargePort) {
+  const start = PORT_COORDINATES[loadPort];
+  const end = PORT_COORDINATES[dischargePort];
+  if (!start || !end) return 0;
+  return getDistanceNm(start.lat, start.lon, end.lat, end.lon);
+}
 
 /* ---------------- primitives ---------------- */
 
@@ -343,13 +482,20 @@ function DealCalculator() {
   const suggestInsurance = INCOTERMS[saleIncoterm].insurance && !INCOTERMS[purchaseIncoterm].insurance;
   const [freightOn, setFreightOn] = useState(suggestFreight);
   const [insuranceOn, setInsuranceOn] = useState(suggestInsurance);
-  useEffect(() => { setFreightOn(suggestFreight); }, [purchaseIncoterm, saleIncoterm]);
-  useEffect(() => { setInsuranceOn(suggestInsurance); }, [purchaseIncoterm, saleIncoterm]);
-
+  const [freightMode, setFreightMode] = useState("auto");
   const [freightLeg1, setFreightLeg1] = useState(1900000);
   const [freightLeg2, setFreightLeg2] = useState(0);
+  const [freightRatePerNm, setFreightRatePerNm] = useState(getSuggestedFreightRate(commodity.name, loadPort, dischargePort));
   const [insurancePct, setInsurancePct] = useState(0.11);
   const [institute110, setInstitute110] = useState(true);
+
+  useEffect(() => { setFreightOn(suggestFreight); }, [purchaseIncoterm, saleIncoterm]);
+  useEffect(() => { setInsuranceOn(suggestInsurance); }, [purchaseIncoterm, saleIncoterm]);
+  useEffect(() => {
+    if (freightMode === "auto") {
+      setFreightRatePerNm(getSuggestedFreightRate(commodity.name, loadPort, dischargePort));
+    }
+  }, [freightMode, commodity.name, loadPort, dischargePort]);
 
   // Other costs
   const [inspectionRate, setInspectionRate] = useState(0.25);
@@ -381,7 +527,13 @@ function DealCalculator() {
     const saleTotal = salePerUnit * q;
     const purchaseTotal = purchasePerUnit * q;
 
-    const freightTotal = freightOn ? (num(freightLeg1) + num(freightLeg2)) : 0;
+    const distanceNm = getPortDistance(loadPort, dischargePort);
+    const quantityMt = commodity.unit === "KG" ? q / 1000 : q;
+    const freightTotal = freightOn
+      ? freightMode === "auto"
+        ? quantityMt * num(freightRatePerNm) * distanceNm
+        : (num(freightLeg1) + num(freightLeg2))
+      : 0;
     const insuranceBase = (purchaseTotal + freightTotal) * (institute110 ? 1.10 : 1.0);
     const insuranceCost = insuranceOn ? (num(insurancePct) / 100) * insuranceBase : 0;
 
@@ -434,11 +586,11 @@ function DealCalculator() {
       inspectionCost, demurrageCost, commissionCost, agencyCost, fxCost,
       financeCargoCost, financeFreightCost, hedgeCost, cashBackAmount, lcDiscountCost,
       lineItems, costsGrandTotal, totalCostsInclCargo, margin, marginPerUnit,
-      marginPctOfSale, roiOnPurchase, breakEvenPerUnit, bbl,
+      marginPctOfSale, roiOnPurchase, breakEvenPerUnit, bbl, distanceNm,
     };
   }, [
     quantity, benchmarkPrice, saleDiscount, purchaseDiscount, escalation,
-    freightOn, freightLeg1, freightLeg2, insuranceOn, insurancePct, institute110,
+    freightOn, freightLeg1, freightLeg2, freightMode, freightRatePerNm, insuranceOn, insurancePct, institute110,
     inspectionRate, demDays, demRate, outturn, storageCost, commissionRate, agencyRate, fxPct,
     financeCargoPct, fcDays, financeFreightPct, ffDays, hedgePct, collateralPct, exposureDays,
     cashBackPct, prepaymentDays, lcPct, lcDays, commodity,
@@ -573,8 +725,39 @@ function DealCalculator() {
             <Toggle checked={freightOn} onChange={setFreightOn} label={`Gemini bears freight cost ${suggestFreight ? "(suggested: on)" : "(suggested: off)"}`} />
             {freightOn && (
               <>
-                <FieldRow label="Freight, Leg 1"><NumberInput value={freightLeg1} onChange={setFreightLeg1} /></FieldRow>
-                <FieldRow label="Freight, Leg 2"><NumberInput value={freightLeg2} onChange={setFreightLeg2} /></FieldRow>
+                <FieldRow label="Freight mode">
+                  <Select
+                    value={freightMode}
+                    onChange={setFreightMode}
+                    options={[
+                      { value: "auto", label: "Auto — by distance" },
+                      { value: "manual", label: "Manual legs" },
+                    ]}
+                    w="w-full"
+                  />
+                </FieldRow>
+                {freightMode === "auto" ? (
+                  <>
+                    <FieldRow label="Distance">
+                      <span className="mono">{fmt(c.distanceNm, 1)} nm</span>
+                    </FieldRow>
+                    <FieldRow label="Rate">
+                      <NumberInput value={freightRatePerNm} onChange={setFreightRatePerNm} w="w-24" step="0.001" />
+                      <span className="text-[12px]" style={{color:"var(--steel)"}}>/MT/NM</span>
+                    </FieldRow>
+                    <FieldRow label="Freight total">
+                      <span className="mono">{usd(c.freightTotal)}</span>
+                    </FieldRow>
+                    <div className="text-[11px]" style={{color:"var(--steel)"}}>
+                      Freight is estimated from route distance and cargo tons. Adjust rate if needed.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <FieldRow label="Freight, Leg 1"><NumberInput value={freightLeg1} onChange={setFreightLeg1} /></FieldRow>
+                    <FieldRow label="Freight, Leg 2"><NumberInput value={freightLeg2} onChange={setFreightLeg2} /></FieldRow>
+                  </>
+                )}
               </>
             )}
             <div className="mt-2">
@@ -697,6 +880,29 @@ function DealCalculator() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<DealCalculator />);
+</script>
+
+<script>
+  (function(){
+    var root = document.getElementById('root');
+    var fallback = document.getElementById('calc-fallback');
+    var reloadBtn = document.getElementById('calc-fallback-reload');
+    var instrBtn = document.getElementById('calc-fallback-console');
+    var instr = document.getElementById('calc-fallback-instr');
+    if (reloadBtn) reloadBtn.addEventListener('click', function(){ location.reload(); });
+    if (instrBtn && instr) instrBtn.addEventListener('click', function(){ instr.style.display = instr.style.display === 'none' ? 'block' : 'none'; });
+    // If the React app hasn't mounted into #root after a short delay, show the fallback.
+    setTimeout(function(){
+      try {
+        var hasChildren = root && root.children && root.children.length > 0;
+        if (!hasChildren && fallback) {
+          fallback.style.display = 'flex';
+        }
+      } catch (e) {
+        if (fallback) fallback.style.display = 'flex';
+      }
+    }, 1500);
+  })();
 </script>
 </body>
 </html>
