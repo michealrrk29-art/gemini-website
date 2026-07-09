@@ -117,20 +117,24 @@ const PORT_OPTIONS = [
 ];
 
 const ROUTE_PRESETS = [
-  { label: "Nigeria → Rotterdam (Jet A1)", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands", note: "Typical jet fuel flow for European end users" },
-  { label: "Morocco → Rotterdam", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Rotterdam, Netherlands", note: "North Africa to Northwest Europe" },
-  { label: "Morocco → Indonesia", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Tanjung Priok, Indonesia", note: "Long-haul re-export scenario" },
-  { label: "Russia → Rotterdam", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", note: "Classic diesel export route" },
-  { label: "UAE → Singapore", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", note: "Middle East to Asia transshipment" },
-  { label: "Nigeria → Antwerp", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Antwerp, Belgium", note: "West Africa to continental Europe" },
+  { label: "Aviation — Nigeria → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "Lufthansa / kerosene route into Northwest Europe" },
+  { label: "Aviation — Morocco → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "North Africa jet fuel export" },
+  { label: "Aviation — UAE → Singapore", category: "Petroleum products", commodity: "Jet A1", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", sector: "Aviation", note: "Gulf jet fuel to Asia" },
+  { label: "Diesel — Russia → Rotterdam", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", sector: "Diesel", note: "Standard long-haul diesel flow" },
+  { label: "Diesel — UAE → Singapore", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", sector: "Diesel", note: "Gulf to Southeast Asia" },
+  { label: "Diesel — Baltic → Hamburg", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Rotterdam, Netherlands", dischargePort: "Hamburg, Germany", sector: "Diesel", note: "Short regional refinery-to-port trade" },
+  { label: "Agrochem — Black Sea → Vietnam", category: "Fertilizers", commodity: "Urea, Prilled", loadPort: "Novorossiysk, Russia", dischargePort: "Ho Chi Minh City, Vietnam", sector: "Agriculture", note: "Urea export to Southeast Asia" },
+  { label: "Agrochem — India → Vietnam", category: "Agri commodities", commodity: "Cashew Kernels, W320", loadPort: "Mumbai, India", dischargePort: "Ho Chi Minh City, Vietnam", sector: "Agriculture", note: "High-value agricultural cargo to Vietnam" },
+  { label: "Agrochem — Black Sea → Northwest Europe", category: "Fertilizers", commodity: "Urea, Granular", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", sector: "Agriculture", note: "Fertilizer flow into Europe" },
 ];
 
 const COMMODITY_DEFAULT_ROUTES = {
   "Jet A1": { loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands" },
   "ULSD 10ppm (Gasoil)": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
   "Gasoline AI-92": { loadPort: "Novorossiysk, Russia", dischargePort: "Antwerp, Belgium" },
-  "Urea, Prilled": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
-};
+  "Urea, Prilled": { loadPort: "Novorossiysk, Russia", dischargePort: "Ho Chi Minh City, Vietnam" },
+  "Urea, Granular": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
+  "Cashew Kernels, W320": { loadPort: "Mumbai, India", dischargePort: "Ho Chi Minh City, Vietnam" },
 
 const CATEGORIES = {
   "Petroleum products": [
@@ -288,15 +292,37 @@ function DealCalculator() {
   const [loadPort, setLoadPort] = useState("Tangier Med, Morocco");
   const [dischargePort, setDischargePort] = useState("Tanjung Priok, Indonesia");
   const [quantity, setQuantity] = useState(40000);
+  const [routePresetApplied, setRoutePresetApplied] = useState(false);
+
+  const handleCategoryChange = (value) => {
+    setCategory(value);
+    setCommodityIdx(0);
+  };
+
+  const applyRoutePreset = (preset) => {
+    const categoryItems = CATEGORIES[preset.category] || [];
+    const presetCommodityIdx = categoryItems.findIndex((item) => item.name === preset.commodity);
+    if (presetCommodityIdx >= 0) {
+      setRoutePresetApplied(true);
+      setCategory(preset.category);
+      setCommodityIdx(presetCommodityIdx);
+      setLoadPort(preset.loadPort);
+      setDischargePort(preset.dischargePort);
+    }
+  };
 
   useEffect(() => { setCommodityIdx(0); }, [category]);
   useEffect(() => {
+    if (routePresetApplied) {
+      setRoutePresetApplied(false);
+      return;
+    }
     const defaultRoute = COMMODITY_DEFAULT_ROUTES[commodity.name];
     if (defaultRoute) {
       setLoadPort(defaultRoute.loadPort);
       setDischargePort(defaultRoute.dischargePort);
     }
-  }, [commodity.name]);
+  }, [commodity.name, routePresetApplied]);
 
   // Commercial terms
   const [benchmarkLabel, setBenchmarkLabel] = useState(commodity.benchmark);
@@ -451,7 +477,7 @@ function DealCalculator() {
           <Panel className="p-5">
             <SectionTitle eyebrow="Setup" title="Commodity & route" />
             <FieldRow label="Category">
-              <Select value={category} onChange={setCategory} options={catNames} w="w-52" />
+              <Select value={category} onChange={handleCategoryChange} options={catNames} w="w-52" />
             </FieldRow>
             <FieldRow label="Commodity">
               <Select
@@ -473,16 +499,17 @@ function DealCalculator() {
             </FieldRow>
             <div className="mt-3 rounded-[2px] p-3" style={{ background:"var(--panel-2)", border:"1px solid var(--line)" }}>
               <div className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--brass)"}}>Popular route presets</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {ROUTE_PRESETS.filter((preset) => preset.commodity === commodity.name).map((preset) => (
+              <div className="mt-2 grid gap-2">
+                {ROUTE_PRESETS.map((preset) => (
                   <button
                     key={preset.label}
                     type="button"
-                    onClick={() => { setLoadPort(preset.loadPort); setDischargePort(preset.dischargePort); }}
-                    className="rounded-[2px] px-2.5 py-1.5 text-[11px] uppercase tracking-[0.12em] transition"
+                    onClick={() => applyRoutePreset(preset)}
+                    className="rounded-[2px] px-3 py-2 text-left text-[12px] transition"
                     style={{ background:"var(--panel)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
                   >
-                    {preset.label}
+                    <div className="font-semibold" style={{color:"var(--cream)"}}>{preset.label}</div>
+                    <div className="text-[10px] mt-1" style={{color:"var(--steel)"}}>{preset.sector} · {preset.note}</div>
                   </button>
                 ))}
               </div>
