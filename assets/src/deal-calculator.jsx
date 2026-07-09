@@ -1,0 +1,821 @@
+const { useMemo, useState, useEffect } = React;
+
+/* ---------------- data ---------------- */
+
+const INCOTERMS = {
+  EXW: { freight:false, insurance:false, label:"EXW — Ex Works" },
+  FCA: { freight:false, insurance:false, label:"FCA — Free Carrier" },
+  FOB: { freight:false, insurance:false, label:"FOB — Free On Board" },
+  CFR: { freight:true,  insurance:false, label:"CFR — Cost & Freight" },
+  CIF: { freight:true,  insurance:true,  label:"CIF — Cost, Insurance & Freight" },
+  DAP: { freight:true,  insurance:true,  label:"DAP — Delivered At Place" },
+  DDP: { freight:true,  insurance:true,  label:"DDP — Delivered Duty Paid" },
+};
+const INCOTERM_KEYS = Object.keys(INCOTERMS);
+const PORT_OPTIONS = [
+  "Tangier Med, Morocco",
+  "Casablanca, Morocco",
+  "Mersin, Turkey",
+  "Aliaga, Turkey",
+  "Jebel Ali, UAE",
+  "Murmansk, Russia",
+  "Novorossiysk, Russia",
+  "Rotterdam, Netherlands",
+  "Amsterdam, Netherlands",
+  "Antwerp, Belgium",
+  "Hamburg, Germany",
+  "Bremerhaven, Germany",
+  "Le Havre, France",
+  "Genoa, Italy",
+  "Piraeus, Greece",
+  "Valencia, Spain",
+  "Singapore",
+  "Tanjung Priok, Indonesia",
+  "Jakarta, Indonesia",
+  "Busan, South Korea",
+  "Shanghai, China",
+  "Ningbo-Zhoushan, China",
+  "Yantian, China",
+  "Dubai, UAE",
+  "Abu Dhabi, UAE",
+  "Doha, Qatar",
+  "Jeddah, Saudi Arabia",
+  "King Abdullah Port, Saudi Arabia",
+  "Houston, USA",
+  "New Orleans, USA",
+  "Long Beach, USA",
+  "Los Angeles, USA",
+  "New York / New Jersey, USA",
+  "Santos, Brazil",
+  "Paranagua, Brazil",
+  "Cape Town, South Africa",
+  "Durban, South Africa",
+  "Lagos, Nigeria",
+  "Port Harcourt, Nigeria",
+  "Apapa, Nigeria",
+  "Tema, Ghana",
+  "Abidjan, Ivory Coast",
+  "Mombasa, Kenya",
+  "Dar es Salaam, Tanzania",
+  "Maputo, Mozambique",
+  "Djibouti",
+  "Suez, Egypt",
+  "Alexandria, Egypt",
+  "Haldia, India",
+  "Mumbai, India",
+  "Chennai, India",
+  "Colombo, Sri Lanka",
+  "Port Klang, Malaysia",
+  "Laem Chabang, Thailand",
+  "Ho Chi Minh City, Vietnam",
+  "Hai Phong, Vietnam",
+  "Melbourne, Australia",
+  "Sydney, Australia",
+  "Fremantle, Australia",
+];
+
+const PORT_COORDINATES = {
+  "Tangier Med, Morocco": { lat: 35.85, lon: -5.88 },
+  "Casablanca, Morocco": { lat: 33.95, lon: -6.42 },
+  "Mersin, Turkey": { lat: 36.80, lon: 34.64 },
+  "Aliaga, Turkey": { lat: 38.46, lon: 26.88 },
+  "Jebel Ali, UAE": { lat: 24.98, lon: 55.05 },
+  "Murmansk, Russia": { lat: 68.97, lon: 33.07 },
+  "Novorossiysk, Russia": { lat: 44.72, lon: 37.77 },
+  "Rotterdam, Netherlands": { lat: 51.95, lon: 4.13 },
+  "Amsterdam, Netherlands": { lat: 52.38, lon: 4.90 },
+  "Antwerp, Belgium": { lat: 51.22, lon: 4.40 },
+  "Hamburg, Germany": { lat: 53.55, lon: 9.99 },
+  "Bremerhaven, Germany": { lat: 53.55, lon: 8.58 },
+  "Le Havre, France": { lat: 49.49, lon: 0.10 },
+  "Genoa, Italy": { lat: 44.40, lon: 8.93 },
+  "Piraeus, Greece": { lat: 37.94, lon: 23.64 },
+  "Valencia, Spain": { lat: 39.47, lon: -0.38 },
+  "Singapore": { lat: 1.27, lon: 103.82 },
+  "Tanjung Priok, Indonesia": { lat: 6.12, lon: 106.88 },
+  "Jakarta, Indonesia": { lat: 6.12, lon: 106.85 },
+  "Busan, South Korea": { lat: 35.10, lon: 129.04 },
+  "Shanghai, China": { lat: 31.23, lon: 121.47 },
+  "Ningbo-Zhoushan, China": { lat: 29.95, lon: 121.82 },
+  "Yantian, China": { lat: 22.53, lon: 114.27 },
+  "Dubai, UAE": { lat: 25.25, lon: 55.33 },
+  "Abu Dhabi, UAE": { lat: 24.47, lon: 54.37 },
+  "Doha, Qatar": { lat: 25.27, lon: 51.55 },
+  "Jeddah, Saudi Arabia": { lat: 21.54, lon: 39.15 },
+  "King Abdullah Port, Saudi Arabia": { lat: 23.00, lon: 38.00 },
+  "Houston, USA": { lat: 29.75, lon: -95.37 },
+  "New Orleans, USA": { lat: 29.95, lon: -90.07 },
+  "Long Beach, USA": { lat: 33.77, lon: -118.19 },
+  "Los Angeles, USA": { lat: 33.74, lon: -118.27 },
+  "New York / New Jersey, USA": { lat: 40.65, lon: -74.0 },
+  "Santos, Brazil": { lat: -23.95, lon: -46.33 },
+  "Paranagua, Brazil": { lat: -25.53, lon: -48.52 },
+  "Cape Town, South Africa": { lat: -33.92, lon: 18.42 },
+  "Durban, South Africa": { lat: -29.87, lon: 31.02 },
+  "Lagos, Nigeria": { lat: 6.45, lon: 3.39 },
+  "Port Harcourt, Nigeria": { lat: 4.75, lon: 7.02 },
+  "Apapa, Nigeria": { lat: 6.45, lon: 3.40 },
+  "Tema, Ghana": { lat: 5.66, lon: -0.02 },
+  "Abidjan, Ivory Coast": { lat: 5.35, lon: -4.02 },
+  "Mombasa, Kenya": { lat: -4.05, lon: 39.67 },
+  "Dar es Salaam, Tanzania": { lat: -6.80, lon: 39.28 },
+  "Maputo, Mozambique": { lat: -25.96, lon: 32.58 },
+  "Djibouti": { lat: 11.60, lon: 43.15 },
+  "Suez, Egypt": { lat: 29.97, lon: 32.55 },
+  "Alexandria, Egypt": { lat: 31.20, lon: 29.91 },
+  "Haldia, India": { lat: 22.03, lon: 88.06 },
+  "Mumbai, India": { lat: 18.95, lon: 72.82 },
+  "Chennai, India": { lat: 13.08, lon: 80.28 },
+  "Colombo, Sri Lanka": { lat: 6.93, lon: 79.85 },
+  "Port Klang, Malaysia": { lat: 3.00, lon: 101.35 },
+  "Laem Chabang, Thailand": { lat: 13.09, lon: 100.92 },
+  "Ho Chi Minh City, Vietnam": { lat: 10.76, lon: 106.70 },
+  "Hai Phong, Vietnam": { lat: 20.87, lon: 106.68 },
+  "Melbourne, Australia": { lat: -37.81, lon: 144.96 },
+  "Sydney, Australia": { lat: -33.86, lon: 151.20 },
+  "Fremantle, Australia": { lat: -32.05, lon: 115.74 },
+};
+
+const ROUTE_PRESETS = [
+  { label: "Aviation — Nigeria → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "Lufthansa / kerosene route into Northwest Europe" },
+  { label: "Aviation — Morocco → Rotterdam", category: "Petroleum products", commodity: "Jet A1", loadPort: "Tangier Med, Morocco", dischargePort: "Rotterdam, Netherlands", sector: "Aviation", note: "North Africa jet fuel export" },
+  { label: "Aviation — UAE → Singapore", category: "Petroleum products", commodity: "Jet A1", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", sector: "Aviation", note: "Gulf jet fuel to Asia" },
+  { label: "Diesel — Russia → Rotterdam", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", sector: "Diesel", note: "Standard long-haul diesel flow" },
+  { label: "Diesel — UAE → Singapore", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Jebel Ali, UAE", dischargePort: "Singapore", sector: "Diesel", note: "Gulf to Southeast Asia" },
+  { label: "Diesel — Baltic → Hamburg", category: "Petroleum products", commodity: "ULSD 10ppm (Gasoil)", loadPort: "Rotterdam, Netherlands", dischargePort: "Hamburg, Germany", sector: "Diesel", note: "Short regional refinery-to-port trade" },
+  { label: "Agrochem — Black Sea → Vietnam", category: "Fertilizers", commodity: "Urea, Prilled", loadPort: "Novorossiysk, Russia", dischargePort: "Ho Chi Minh City, Vietnam", sector: "Agriculture", note: "Urea export to Southeast Asia" },
+  { label: "Agrochem — India → Vietnam", category: "Agri commodities", commodity: "Cashew Kernels, W320", loadPort: "Mumbai, India", dischargePort: "Ho Chi Minh City, Vietnam", sector: "Agriculture", note: "High-value agricultural cargo to Vietnam" },
+  { label: "Agrochem — Black Sea → Northwest Europe", category: "Fertilizers", commodity: "Urea, Granular", loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands", sector: "Agriculture", note: "Fertilizer flow into Europe" },
+];
+
+const COMMODITY_DEFAULT_ROUTES = {
+  "Jet A1": { loadPort: "Lagos, Nigeria", dischargePort: "Rotterdam, Netherlands" },
+  "ULSD 10ppm (Gasoil)": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
+  "Gasoline AI-92": { loadPort: "Novorossiysk, Russia", dischargePort: "Antwerp, Belgium" },
+  "Urea, Prilled": { loadPort: "Novorossiysk, Russia", dischargePort: "Ho Chi Minh City, Vietnam" },
+  "Urea, Granular": { loadPort: "Novorossiysk, Russia", dischargePort: "Rotterdam, Netherlands" },
+  "Cashew Kernels, W320": { loadPort: "Mumbai, India", dischargePort: "Ho Chi Minh City, Vietnam" },
+};
+
+const FREIGHT_RATE_DEFAULTS = {
+  "Jet A1": 0.030,
+  "ULSD 10ppm (Gasoil)": 0.022,
+  "Gasoline AI-92": 0.023,
+  "Gasoline AI-95 (Euro-5)": 0.024,
+  "Crude Oil — Urals": 0.020,
+  "Crude Oil — ESPO": 0.020,
+  "Urea, Prilled": 0.018,
+  "Urea, Granular": 0.017,
+  "Ammonium Nitrate": 0.017,
+  "Tungsten Oxide (APT)": 0.025,
+  "Copper Cathode, Grade A": 0.030,
+  "Gold, 995/999": 0.035,
+  "Rare Earth Oxides": 0.028,
+  "Cocoa Beans": 0.019,
+  "Green Coffee, Robusta": 0.020,
+  "Green Coffee, Arabica": 0.022,
+  "Cashew Kernels, W320": 0.021,
+  "Granulated Sulfur": 0.017,
+  "Wheat": 0.016,
+};
+
+const FREIGHT_RATE_ROUTE_OVERRIDES = {
+  "Lagos, Nigeria|Rotterdam, Netherlands": 0.035,
+  "Tangier Med, Morocco|Rotterdam, Netherlands": 0.028,
+  "Jebel Ali, UAE|Singapore": 0.031,
+  "Novorossiysk, Russia|Ho Chi Minh City, Vietnam": 0.025,
+  "Novorossiysk, Russia|Rotterdam, Netherlands": 0.022,
+};
+
+function getSuggestedFreightRate(commodityName, loadPort, dischargePort) {
+  const key = `${loadPort}|${dischargePort}`;
+  return FREIGHT_RATE_ROUTE_OVERRIDES[key] ?? FREIGHT_RATE_DEFAULTS[commodityName] ?? 0.025;
+}
+
+const CATEGORIES = {
+  "Petroleum products": [
+    { name: "ULSD 10ppm (Gasoil)", unit: "MT", benchmark: "ULSD 10ppm CIF NWE", density: 0.845, petro: true, quote: 945.25 },
+    { name: "Gasoline AI-92", unit: "MT", benchmark: "AI-92 FOB Black Sea", density: 0.745, petro: true, quote: 760.5 },
+    { name: "Gasoline AI-95 (Euro-5)", unit: "MT", benchmark: "AI-95 FOB Black Sea", density: 0.755, petro: true, quote: 789.4 },
+    { name: "Jet A1", unit: "MT", benchmark: "Jet A1 FOB ARA", density: 0.804, petro: true, quote: 815.0 },
+    { name: "Crude Oil — Urals", unit: "MT", benchmark: "Urals FOB Primorsk", density: 0.870, petro: true, quote: 670.1 },
+    { name: "Crude Oil — ESPO", unit: "MT", benchmark: "ESPO FOB Kozmino", density: 0.855, petro: true, quote: 697.8 },
+  ],
+  "Fertilizers": [
+    { name: "Urea, Prilled", unit: "MT", benchmark: "Urea Prilled FOB Black Sea", quote: 320.0 },
+    { name: "Urea, Granular", unit: "MT", benchmark: "Urea Granular FOB Baltic", quote: 315.5 },
+    { name: "Ammonium Nitrate", unit: "MT", benchmark: "AN FOB Black Sea", quote: 300.0 },
+  ],
+  "Metals & minerals": [
+    { name: "Tungsten Oxide (APT)", unit: "MT", benchmark: "APT Europe (Metal Bulletin)", quote: 3300.0 },
+    { name: "Copper Cathode, Grade A", unit: "MT", benchmark: "LME Copper Cash", quote: 9200.0 },
+    { name: "Gold, 995/999", unit: "KG", benchmark: "LBMA AM Fix", quote: 2250.0 },
+    { name: "Rare Earth Oxides", unit: "MT", benchmark: "Asian Metal RE Index", quote: 5200.0 },
+  ],
+  "Agri commodities": [
+    { name: "Cocoa Beans", unit: "MT", benchmark: "ICE Cocoa (London)", quote: 3450.0 },
+    { name: "Green Coffee, Robusta", unit: "MT", benchmark: "ICE Robusta", quote: 2200.0 },
+    { name: "Green Coffee, Arabica", unit: "MT", benchmark: "ICE Arabica", quote: 5000.0 },
+    { name: "Cashew Kernels, W320", unit: "MT", benchmark: "Vietnam FOB W320", quote: 3400.0 },
+    { name: "Granulated Sulfur", unit: "MT", benchmark: "Sulfur FOB Black Sea", quote: 140.0 },
+    { name: "Wheat", unit: "MT", benchmark: "Black Sea FOB", quote: 240.0 },
+  ],
+};
+
+/* ---------------- helpers ---------------- */
+
+const fmt = (n, d = 2) =>
+  (isFinite(n) ? n : 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const usd = (n) => `$${fmt(n)}`;
+const num = (v) => (v === "" || v === null || v === undefined ? 0 : parseFloat(v));
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function getDistanceNm(lat1, lon1, lat2, lon2) {
+  const R = 3440.065; // nautical miles
+  const φ1 = toRadians(lat1);
+  const φ2 = toRadians(lat2);
+  const Δφ = toRadians(lat2 - lat1);
+  const Δλ = toRadians(lon2 - lon1);
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getPortDistance(loadPort, dischargePort) {
+  const start = PORT_COORDINATES[loadPort];
+  const end = PORT_COORDINATES[dischargePort];
+  if (!start || !end) return 0;
+  return getDistanceNm(start.lat, start.lon, end.lat, end.lon);
+}
+
+/* ---------------- primitives ---------------- */
+
+function Eyebrow({ children }) {
+  return <div className="text-[11px] uppercase tracking-[0.22em] text-[--steel]" style={{color:"var(--brass)"}}>{children}</div>;
+}
+
+function SectionTitle({ eyebrow, title }) {
+  return (
+    <div className="mb-5">
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="serif mt-1 text-2xl md:text-[26px] text-[--cream]" style={{color:"var(--cream)"}}>{title}</h2>
+    </div>
+  );
+}
+
+function Panel({ children, className }) {
+  return (
+    <div
+      className={`rounded-sm ${className||""}`}
+      style={{ background:"var(--panel)", border:"1px solid var(--line)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FieldRow({ label, children }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 border-b" style={{borderColor:"var(--line)"}}>
+      <span className="text-[13px]" style={{color:"var(--steel)"}}>{label}</span>
+      <div className="flex items-center gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function NumberInput({ value, onChange, w = "w-28", step = "any" }) {
+  return (
+    <input
+      type="number"
+      step={step}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${w} mono rounded-[2px] px-2 py-1 text-right text-[13px] outline-none`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--brass)" }}
+    />
+  );
+}
+
+function TextInput({ value, onChange, w = "w-40", listId, placeholder = "" }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      list={listId}
+      placeholder={placeholder}
+      className={`${w} rounded-[2px] px-2 py-1 text-right text-[13px] outline-none`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+    />
+  );
+}
+
+function Select({ value, onChange, options, w = "w-44" }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${w} rounded-[2px] px-2 py-1.5 text-[13px] outline-none cursor-pointer`}
+      style={{ background:"var(--panel-2)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+    >
+      {options.map((o) => (
+        <option key={o.value || o} value={o.value || o} style={{background:"#0F2233", color:"#F2EEE3"}}>
+          {o.label || o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Toggle({ checked, onChange, label }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none py-2">
+      <span
+        onClick={() => onChange(!checked)}
+        className="relative inline-block h-5 w-9 rounded-full transition-colors"
+        style={{ background: checked ? "var(--brass)" : "var(--panel-2)", border:"1px solid var(--line-strong)" }}
+      >
+        <span
+          className="absolute top-[1px] h-[16px] w-[16px] rounded-full transition-all"
+          style={{ left: checked ? "17px" : "1px", background: checked ? "#0D1B2A" : "var(--steel)" }}
+        />
+      </span>
+      <span className="text-[13px]" style={{color:"var(--steel)"}}>{label}</span>
+    </label>
+  );
+}
+
+function ResultRow({ label, value, bold, dim }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-[13px]" style={{color: dim ? "rgba(143,163,184,0.7)" : "var(--steel)", fontStyle: dim?"italic":"normal"}}>{label}</span>
+      <span className={`mono text-[13px] ${bold?"font-semibold":""}`} style={{color: bold ? "var(--cream)" : "var(--cream)"}}>{value}</span>
+    </div>
+  );
+}
+
+/* ---------------- main ---------------- */
+
+function DealCalculator() {
+  // Commodity & route
+  const catNames = Object.keys(CATEGORIES);
+  const [category, setCategory] = useState(catNames[0]);
+  const items = CATEGORIES[category];
+  const [commodityIdx, setCommodityIdx] = useState(0);
+  const commodity = items[commodityIdx] || items[0];
+
+  const [loadPort, setLoadPort] = useState("Tangier Med, Morocco");
+  const [dischargePort, setDischargePort] = useState("Tanjung Priok, Indonesia");
+  const [quantity, setQuantity] = useState(40000);
+  const [routePresetApplied, setRoutePresetApplied] = useState(false);
+
+  const handleCategoryChange = (value) => {
+    setCategory(value);
+    setCommodityIdx(0);
+  };
+
+  const applyRoutePreset = (preset) => {
+    const categoryItems = CATEGORIES[preset.category] || [];
+    const presetCommodityIdx = categoryItems.findIndex((item) => item.name === preset.commodity);
+    if (presetCommodityIdx >= 0) {
+      setRoutePresetApplied(true);
+      setCategory(preset.category);
+      setCommodityIdx(presetCommodityIdx);
+      setLoadPort(preset.loadPort);
+      setDischargePort(preset.dischargePort);
+    }
+  };
+
+  useEffect(() => { setCommodityIdx(0); }, [category]);
+  useEffect(() => {
+    if (routePresetApplied) {
+      setRoutePresetApplied(false);
+      return;
+    }
+    const defaultRoute = COMMODITY_DEFAULT_ROUTES[commodity.name];
+    if (defaultRoute) {
+      setLoadPort(defaultRoute.loadPort);
+      setDischargePort(defaultRoute.dischargePort);
+    }
+  }, [commodity.name, routePresetApplied]);
+
+  // Commercial terms
+  const [benchmarkLabel, setBenchmarkLabel] = useState(commodity.benchmark);
+  const [benchmarkPrice, setBenchmarkPrice] = useState(commodity.quote ?? 945.25);
+  useEffect(() => {
+    setBenchmarkLabel(commodity.benchmark);
+    setBenchmarkPrice(commodity.quote ?? 0);
+  }, [category, commodityIdx, commodity]);
+
+  const [purchaseIncoterm, setPurchaseIncoterm] = useState("CIF");
+  const [saleIncoterm, setSaleIncoterm] = useState("DAP");
+  const [purchaseDiscount, setPurchaseDiscount] = useState(95.0);
+  const [saleDiscount, setSaleDiscount] = useState(15.0);
+  const [escalation, setEscalation] = useState(13.29);
+
+  // Freight & insurance
+  const suggestFreight = INCOTERMS[saleIncoterm].freight && !INCOTERMS[purchaseIncoterm].freight;
+  const suggestInsurance = INCOTERMS[saleIncoterm].insurance && !INCOTERMS[purchaseIncoterm].insurance;
+  const [freightOn, setFreightOn] = useState(suggestFreight);
+  const [insuranceOn, setInsuranceOn] = useState(suggestInsurance);
+  const [freightMode, setFreightMode] = useState("auto");
+  const [freightLeg1, setFreightLeg1] = useState(1900000);
+  const [freightLeg2, setFreightLeg2] = useState(0);
+  const [freightRatePerNm, setFreightRatePerNm] = useState(getSuggestedFreightRate(commodity.name, loadPort, dischargePort));
+  const [insurancePct, setInsurancePct] = useState(0.11);
+  const [institute110, setInstitute110] = useState(true);
+
+  useEffect(() => { setFreightOn(suggestFreight); }, [purchaseIncoterm, saleIncoterm]);
+  useEffect(() => { setInsuranceOn(suggestInsurance); }, [purchaseIncoterm, saleIncoterm]);
+  useEffect(() => {
+    if (freightMode === "auto") {
+      setFreightRatePerNm(getSuggestedFreightRate(commodity.name, loadPort, dischargePort));
+    }
+  }, [freightMode, commodity.name, loadPort, dischargePort]);
+
+  // Other costs
+  const [inspectionRate, setInspectionRate] = useState(0.25);
+  const [demDays, setDemDays] = useState(2);
+  const [demRate, setDemRate] = useState(40000);
+  const [outturn, setOutturn] = useState(0);
+  const [storageCost, setStorageCost] = useState(0);
+  const [commissionRate, setCommissionRate] = useState(3);
+  const [agencyRate, setAgencyRate] = useState(2);
+  const [fxPct, setFxPct] = useState(0.3);
+
+  // Financing
+  const [financeCargoPct, setFinanceCargoPct] = useState(0);
+  const [fcDays, setFcDays] = useState(51);
+  const [financeFreightPct, setFinanceFreightPct] = useState(0);
+  const [ffDays, setFfDays] = useState(21);
+  const [hedgePct, setHedgePct] = useState(15);
+  const [collateralPct, setCollateralPct] = useState(10);
+  const [exposureDays, setExposureDays] = useState(0);
+  const [cashBackPct, setCashBackPct] = useState(0);
+  const [prepaymentDays, setPrepaymentDays] = useState(30);
+  const [lcPct, setLcPct] = useState(10);
+  const [lcDays, setLcDays] = useState(0);
+
+  const c = useMemo(() => {
+    const q = num(quantity);
+    const salePerUnit = num(benchmarkPrice) - num(saleDiscount) + num(escalation);
+    const purchasePerUnit = num(benchmarkPrice) - num(purchaseDiscount) + num(escalation);
+    const saleTotal = salePerUnit * q;
+    const purchaseTotal = purchasePerUnit * q;
+
+    const distanceNm = getPortDistance(loadPort, dischargePort);
+    const quantityMt = commodity.unit === "KG" ? q / 1000 : q;
+    const freightTotal = freightOn
+      ? freightMode === "auto"
+        ? quantityMt * num(freightRatePerNm) * distanceNm
+        : (num(freightLeg1) + num(freightLeg2))
+      : 0;
+    const insuranceBase = (purchaseTotal + freightTotal) * (institute110 ? 1.10 : 1.0);
+    const insuranceCost = insuranceOn ? (num(insurancePct) / 100) * insuranceBase : 0;
+
+    const inspectionCost = num(inspectionRate) * q;
+    const demurrageCost = num(demDays) * num(demRate);
+    const commissionCost = num(commissionRate) * q;
+    const agencyCost = num(agencyRate) * q;
+    const fxCost = (num(fxPct) / 100) * saleTotal;
+
+    const financeCargoCost = purchaseTotal * (num(financeCargoPct) / 100) * (num(fcDays) / 360);
+    const financeFreightCost = freightTotal * (num(financeFreightPct) / 100) * (num(ffDays) / 360);
+    const hedgeExposure = purchaseTotal * (1 - num(collateralPct) / 100);
+    const hedgeCost = hedgeExposure * (num(hedgePct) / 100) * (num(exposureDays) / 360);
+    const prepaymentAmount = purchaseTotal;
+    const cashBackAmount = prepaymentAmount * (num(cashBackPct) / 100) * (num(prepaymentDays) / 360);
+    const lcDiscountCost = purchaseTotal * (num(lcPct) / 100) * (num(lcDays) / 360);
+
+    const lineItems = [
+      { label: "Freight", value: freightTotal },
+      { label: "Insurance", value: insuranceCost },
+      { label: "Cargo inspection", value: inspectionCost },
+      { label: "Demurrage", value: demurrageCost },
+      { label: "Outturn", value: Number(outturn) },
+      { label: "Storage", value: Number(storageCost) },
+      { label: "Commissions", value: commissionCost },
+      { label: "Agency / docs", value: agencyCost },
+      { label: "FX conversion", value: fxCost },
+      { label: "Finance — cargo", value: financeCargoCost },
+      { label: "Finance — freight", value: financeFreightCost },
+      { label: "Hedge financing", value: hedgeCost },
+      { label: "Cash back (credit)", value: -cashBackAmount },
+      { label: "LC discounting", value: lcDiscountCost },
+    ];
+
+    const costsGrandTotal = lineItems.reduce((s, i) => s + i.value, 0);
+    const totalCostsInclCargo = purchaseTotal + costsGrandTotal;
+    const margin = saleTotal - totalCostsInclCargo;
+    const marginPerUnit = q ? margin / q : 0;
+    const marginPctOfSale = saleTotal ? (margin / saleTotal) * 100 : 0;
+    const roiOnPurchase = purchaseTotal ? (margin / purchaseTotal) * 100 : 0;
+    const breakEvenPerUnit = q ? totalCostsInclCargo / q : 0;
+
+    let bbl = null;
+    if (commodity.petro && commodity.density) {
+      bbl = (q * 6.2898) / commodity.density;
+    }
+
+    return {
+      q, salePerUnit, purchasePerUnit, saleTotal, purchaseTotal, freightTotal, insuranceCost,
+      inspectionCost, demurrageCost, commissionCost, agencyCost, fxCost,
+      financeCargoCost, financeFreightCost, hedgeCost, cashBackAmount, lcDiscountCost,
+      lineItems, costsGrandTotal, totalCostsInclCargo, margin, marginPerUnit,
+      marginPctOfSale, roiOnPurchase, breakEvenPerUnit, bbl, distanceNm,
+    };
+  }, [
+    quantity, benchmarkPrice, saleDiscount, purchaseDiscount, escalation,
+    freightOn, freightLeg1, freightLeg2, freightMode, freightRatePerNm, insuranceOn, insurancePct, institute110,
+    inspectionRate, demDays, demRate, outturn, storageCost, commissionRate, agencyRate, fxPct,
+    financeCargoPct, fcDays, financeFreightPct, ffDays, hedgePct, collateralPct, exposureDays,
+    cashBackPct, prepaymentDays, lcPct, lcDays, commodity,
+  ]);
+
+  const marginPositive = c.margin >= 0;
+  const maxCost = Math.max(1, ...c.lineItems.map((i) => Math.abs(i.value)));
+
+  return (
+    <div style={{ background:"var(--navy)", color:"var(--cream)" }} className="min-h-screen">
+      {/* nav */}
+      <div className="border-b" style={{ borderColor:"var(--line)" }}>
+        <div className="mx-auto max-w-6xl px-5 py-4 flex items-center justify-between">
+          <div className="serif text-[15px] tracking-wide" style={{color:"var(--cream)"}}>GEMINI <span style={{color:"var(--brass)"}}>·</span> <span className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--steel)"}}>Commercial Broker</span></div>
+          <div className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--steel)"}}>Deal Calculator</div>
+        </div>
+      </div>
+
+      {/* hero */}
+      <div className="mx-auto max-w-6xl px-5 pt-10 pb-6">
+        <Eyebrow>Internal tool</Eyebrow>
+        <h1 className="serif mt-2 text-3xl md:text-4xl" style={{color:"var(--cream)"}}>Physical trade P&amp;L calculator</h1>
+        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed" style={{color:"var(--steel)"}}>
+          Select commodity, price basis and delivery terms — freight and insurance are applied automatically based on the Incoterms gap between purchase and sale legs. All figures recalculate live.
+        </p>
+      </div>
+
+      <datalist id="port-options">
+        {PORT_OPTIONS.map((port) => <option key={port} value={port} />)}
+      </datalist>
+
+      <div className="mx-auto max-w-6xl px-5 pb-16 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Commodity & route */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Setup" title="Commodity & route" />
+            <FieldRow label="Category">
+              <Select value={category} onChange={handleCategoryChange} options={catNames} w="w-52" />
+            </FieldRow>
+            <FieldRow label="Commodity">
+              <Select
+                value={commodityIdx}
+                onChange={(v) => setCommodityIdx(Number(v))}
+                options={items.map((it, i) => ({ value: i, label: it.name }))}
+                w="w-52"
+              />
+            </FieldRow>
+            <FieldRow label="Quantity">
+              <NumberInput value={quantity} onChange={setQuantity} step="1" />
+              <span className="text-[12px] w-10" style={{color:"var(--steel)"}}>{commodity.unit}</span>
+            </FieldRow>
+            <FieldRow label="Port of loading">
+              <TextInput value={loadPort} onChange={setLoadPort} listId="port-options" placeholder="Type or select" />
+            </FieldRow>
+            <FieldRow label="Discharge port">
+              <TextInput value={dischargePort} onChange={setDischargePort} listId="port-options" placeholder="Type or select" />
+            </FieldRow>
+            <div className="mt-3 rounded-[2px] p-3" style={{ background:"var(--panel-2)", border:"1px solid var(--line)" }}>
+              <div className="text-[11px] uppercase tracking-[0.2em]" style={{color:"var(--brass)"}}>Popular route presets</div>
+              <div className="mt-2 grid gap-2">
+                {ROUTE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => applyRoutePreset(preset)}
+                    className="rounded-[2px] px-3 py-2 text-left text-[12px] transition"
+                    style={{ background:"var(--panel)", border:"1px solid var(--line-strong)", color:"var(--cream)" }}
+                  >
+                    <div className="font-semibold" style={{color:"var(--cream)"}}>{preset.label}</div>
+                    <div className="text-[10px] mt-1" style={{color:"var(--steel)"}}>{preset.sector} · {preset.note}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 text-[12px]" style={{color:"var(--steel)"}}>
+                Selected route: <span className="mono" style={{color:"var(--cream)"}}>{loadPort} → {dischargePort}</span>
+              </div>
+            </div>
+            {commodity.petro && (
+              <div className="pt-2 text-[12px]" style={{color:"var(--steel)"}}>
+                ≈ <span className="mono" style={{color:"var(--brass)"}}>{fmt(c.bbl, 0)}</span> bbl at density {commodity.density} — indicative conversion only.
+              </div>
+            )}
+          </Panel>
+
+          {/* Commercial terms */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Pricing" title="Commercial terms" />
+            <FieldRow label="Benchmark">
+              <TextInput value={benchmarkLabel} onChange={setBenchmarkLabel} w="w-52" />
+            </FieldRow>
+            <FieldRow label="Benchmark price">
+              <NumberInput value={benchmarkPrice} onChange={setBenchmarkPrice} />
+              <span className="text-[12px] w-14" style={{color:"var(--steel)"}}>/{commodity.unit}</span>
+            </FieldRow>
+            <FieldRow label="Escalation (+)">
+              <NumberInput value={escalation} onChange={setEscalation} />
+            </FieldRow>
+
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <div>
+                <Eyebrow>Purchase leg</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <Select value={purchaseIncoterm} onChange={setPurchaseIncoterm} options={INCOTERM_KEYS.map(k=>({value:k,label:INCOTERMS[k].label}))} w="w-full" />
+                  <FieldRow label="Discount to bmk">
+                    <NumberInput value={purchaseDiscount} onChange={setPurchaseDiscount} w="w-24" />
+                  </FieldRow>
+                  <ResultRow label="Price / unit" value={usd(c.purchasePerUnit)} />
+                  <ResultRow label="Purchase Total" value={usd(c.purchaseTotal)} bold />
+                </div>
+              </div>
+              <div>
+                <Eyebrow>Sale leg</Eyebrow>
+                <div className="mt-2 space-y-2">
+                  <Select value={saleIncoterm} onChange={setSaleIncoterm} options={INCOTERM_KEYS.map(k=>({value:k,label:INCOTERMS[k].label}))} w="w-full" />
+                  <FieldRow label="Discount to bmk">
+                    <NumberInput value={saleDiscount} onChange={setSaleDiscount} w="w-24" />
+                  </FieldRow>
+                  <ResultRow label="Price / unit" value={usd(c.salePerUnit)} />
+                  <ResultRow label="Sale Total" value={usd(c.saleTotal)} bold />
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Freight & insurance */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Logistics" title="Freight & insurance" />
+            <p className="text-[12px] mb-2" style={{color:"var(--steel)"}}>
+              Auto-suggested from the Incoterms gap between {purchaseIncoterm} (purchase) and {saleIncoterm} (sale). Override if your routing differs.
+            </p>
+            <Toggle checked={freightOn} onChange={setFreightOn} label={`Gemini bears freight cost ${suggestFreight ? "(suggested: on)" : "(suggested: off)"}`} />
+            {freightOn && (
+              <>
+                <FieldRow label="Freight mode">
+                  <Select
+                    value={freightMode}
+                    onChange={setFreightMode}
+                    options={[
+                      { value: "auto", label: "Auto — by distance" },
+                      { value: "manual", label: "Manual legs" },
+                    ]}
+                    w="w-full"
+                  />
+                </FieldRow>
+                {freightMode === "auto" ? (
+                  <>
+                    <FieldRow label="Distance">
+                      <span className="mono">{fmt(c.distanceNm, 1)} nm</span>
+                    </FieldRow>
+                    <FieldRow label="Rate">
+                      <NumberInput value={freightRatePerNm} onChange={setFreightRatePerNm} w="w-24" step="0.001" />
+                      <span className="text-[12px]" style={{color:"var(--steel)"}}>/MT/NM</span>
+                    </FieldRow>
+                    <FieldRow label="Freight total">
+                      <span className="mono">{usd(c.freightTotal)}</span>
+                    </FieldRow>
+                    <div className="text-[11px]" style={{color:"var(--steel)"}}>
+                      Freight is estimated from route distance and cargo tons. Adjust rate if needed.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <FieldRow label="Freight, Leg 1"><NumberInput value={freightLeg1} onChange={setFreightLeg1} /></FieldRow>
+                    <FieldRow label="Freight, Leg 2"><NumberInput value={freightLeg2} onChange={setFreightLeg2} /></FieldRow>
+                  </>
+                )}
+              </>
+            )}
+            <div className="mt-2">
+              <Toggle checked={insuranceOn} onChange={setInsuranceOn} label={`Gemini bears insurance cost ${suggestInsurance ? "(suggested: on)" : "(suggested: off)"}`} />
+            </div>
+            {insuranceOn && (
+              <>
+                <FieldRow label="Insurance rate"><NumberInput value={insurancePct} onChange={setInsurancePct} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <Toggle checked={institute110} onChange={setInstitute110} label="Institute Cargo Clause basis (110% of CFR value)" />
+              </>
+            )}
+          </Panel>
+
+          {/* Other costs */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Costs" title="Operational costs" />
+            <FieldRow label="Cargo inspection"><NumberInput value={inspectionRate} onChange={setInspectionRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="Demurrage, days"><NumberInput value={demDays} onChange={setDemDays} w="w-24" step="1" /></FieldRow>
+            <FieldRow label="Demurrage rate"><NumberInput value={demRate} onChange={setDemRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/day</span></FieldRow>
+            <FieldRow label="Outturn loss / gain"><NumberInput value={outturn} onChange={setOutturn} w="w-24" /></FieldRow>
+            <FieldRow label="Storage costs"><NumberInput value={storageCost} onChange={setStorageCost} w="w-24" /></FieldRow>
+            <FieldRow label="Commissions"><NumberInput value={commissionRate} onChange={setCommissionRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="Agency / docs"><NumberInput value={agencyRate} onChange={setAgencyRate} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>/{commodity.unit}</span></FieldRow>
+            <FieldRow label="FX conversion"><NumberInput value={fxPct} onChange={setFxPct} w="w-24" /><span className="text-[12px]" style={{color:"var(--steel)"}}>% of sale</span></FieldRow>
+          </Panel>
+
+          {/* Financing */}
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Working capital" title="Financing" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+              <div>
+                <Eyebrow>Finance — cargo</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={financeCargoPct} onChange={setFinanceCargoPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Days"><NumberInput value={fcDays} onChange={setFcDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.financeCargoCost)} dim />
+              </div>
+              <div>
+                <Eyebrow>Finance — freight</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={financeFreightPct} onChange={setFinanceFreightPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Days"><NumberInput value={ffDays} onChange={setFfDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.financeFreightCost)} dim />
+              </div>
+              <div className="pt-3">
+                <Eyebrow>Hedge financing</Eyebrow>
+                <FieldRow label="Rate"><NumberInput value={hedgePct} onChange={setHedgePct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Collateral"><NumberInput value={collateralPct} onChange={setCollateralPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Exposure days"><NumberInput value={exposureDays} onChange={setExposureDays} w="w-20" step="1" /></FieldRow>
+                <ResultRow label="Cost" value={usd(c.hedgeCost)} dim />
+              </div>
+              <div className="pt-3">
+                <Eyebrow>Cash back / LC</Eyebrow>
+                <FieldRow label="Cash back rate"><NumberInput value={cashBackPct} onChange={setCashBackPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="Prepay days"><NumberInput value={prepaymentDays} onChange={setPrepaymentDays} w="w-20" step="1" /></FieldRow>
+                <FieldRow label="LC discount rate"><NumberInput value={lcPct} onChange={setLcPct} w="w-20" /><span className="text-[12px]" style={{color:"var(--steel)"}}>%</span></FieldRow>
+                <FieldRow label="LC days"><NumberInput value={lcDays} onChange={setLcDays} w="w-20" step="1" /></FieldRow>
+              </div>
+            </div>
+          </Panel>
+        </div>
+
+        {/* Sticky analysis column */}
+        <div className="space-y-6 lg:sticky lg:top-6 self-start">
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Result" title="Margin" />
+            <div
+              className="rounded-sm p-4 mb-4"
+              style={{ background: marginPositive ? "rgba(196,161,94,0.14)" : "rgba(201,123,123,0.14)", border: `1px solid ${marginPositive ? "var(--brass)" : "var(--rose)"}` }}
+            >
+              <div className="text-[11px] uppercase tracking-[0.18em]" style={{color:"var(--steel)"}}>Total margin</div>
+              <div className="mono text-3xl mt-1" style={{color: marginPositive ? "var(--brass)" : "var(--rose)"}}>{usd(c.margin)}</div>
+              <div className="text-[12px] mt-1" style={{color:"var(--steel)"}}>{usd(c.marginPerUnit)} / {commodity.unit} · {fmt(c.marginPctOfSale)}% of sale value</div>
+            </div>
+            <ResultRow label="Sale Price, Total" value={usd(c.saleTotal)} />
+            <ResultRow label="Purchase Price, Total" value={usd(c.purchaseTotal)} />
+            <ResultRow label="Costs Grand Total" value={usd(c.costsGrandTotal)} />
+            <ResultRow label="Total costs incl. cargo" value={usd(c.totalCostsInclCargo)} bold />
+            <div className="mt-2 pt-2 border-t" style={{borderColor:"var(--line)"}}>
+              <ResultRow label="Break-even price" value={usd(c.breakEvenPerUnit) + " /" + commodity.unit} />
+              <ResultRow label="ROI on purchase capital" value={fmt(c.roiOnPurchase) + "%"} />
+            </div>
+          </Panel>
+
+          <Panel className="p-5">
+            <SectionTitle eyebrow="Analysis" title="Cost structure" />
+            <div className="space-y-2.5">
+              {c.lineItems.filter(i => Math.abs(i.value) > 0.005).map((i) => (
+                <div key={i.label}>
+                  <div className="flex items-center justify-between text-[12px] mb-1">
+                    <span style={{color:"var(--steel)"}}>{i.label}</span>
+                    <span className="mono" style={{color: i.value < 0 ? "var(--mint)" : "var(--cream)"}}>{i.value < 0 ? "−" : ""}{usd(Math.abs(i.value))}</span>
+                  </div>
+                  <div className="h-[3px] w-full rounded-full" style={{background:"var(--panel-2)"}}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(100, (Math.abs(i.value) / maxCost) * 100)}%`,
+                        background: i.value < 0 ? "var(--mint)" : "var(--brass)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {c.lineItems.every(i => Math.abs(i.value) < 0.005) && (
+                <div className="text-[12px]" style={{color:"var(--steel)"}}>No cost lines active — adjust rates above.</div>
+              )}
+            </div>
+          </Panel>
+
+          <div className="text-[11px] leading-relaxed" style={{color:"var(--steel)"}}>
+            Financing costs use a days/360 cost-of-carry convention. Freight and insurance inclusion follows standard Incoterms responsibility (FOB/EXW/FCA = buyer arranges; CFR = freight only; CIF/DAP/DDP = freight &amp; insurance) — override manually for non-standard routings.
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t py-6 text-center text-[11px]" style={{ borderColor:"var(--line)", color:"var(--steel)" }}>
+        GEMINI · Commercial Broker · Dubai — internal deal tool, not for external distribution.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<DealCalculator />);
